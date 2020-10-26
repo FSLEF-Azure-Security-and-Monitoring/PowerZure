@@ -61,6 +61,7 @@ function Show-AzureCurrentUser
             $coll += $RBACRoleCollection
             }
         }
+        $obj | Add-Member -MemberType NoteProperty -Name TenantID -Value $APSUser.Tenant.id
 		$obj | Add-Member -MemberType NoteProperty -Name Username -Value $user.userPrincipalName
 		$obj | Add-Member -MemberType NoteProperty -Name ObjectId -Value $userId
         $obj | Add-Member -MemberType NoteProperty -Name AADRoles -Value $AADRoles
@@ -131,7 +132,7 @@ function PowerZure
                 $Readhost = Read-Host " ( y / n ) " 
                 if ($ReadHost -eq 'y' -or $Readhost -eq 'yes') 
                 {
-	                Install-Module -Name Az -AllowClobber -Scope CurrentUser
+	                Install-module -Name AzureADPreview -AllowClobber
 	                $Modules = Get-InstalledModule       
 		            if ($Modules.Name -contains 'AzureADPreview')
 		            {
@@ -168,6 +169,7 @@ function PowerZure
 
 Get-AzureADRole -------------------- Gets the members of one or all Azure AD role. Roles does not mean groups.
 Get-AzureAppOwners ----------------- Returns all owners of all Applications in AAD
+Get-AzureDeviceOwners -------------- Lists the owners of devices in AAD. This will only show devices that have an owner.
 Get-AzureGroup --------------------- Gathers a specific group or all groups in AzureAD and lists their members.
 Get-AzureIntuneScript -------------- Lists available Intune scripts in Azure Intune
 Get-AzureLogicAppConnector --------- Lists the connector APIs in Azure
@@ -230,7 +232,7 @@ Write-Host @'
     {
             Show-AzureCurrentUser
             Write-Host ""
-            Write-Host "Please set your default subscription with 'Set-Subscription -Id {id} if you have multiple subscriptions." -ForegroundColor Yellow
+            Write-Host "Please set your default subscription with 'Set-AzureSubscription -Id {id} if you have multiple subscriptions." -ForegroundColor Yellow
 		
     }
         if(!$Welcome -and !$Checks -and !$h)
@@ -1823,5 +1825,35 @@ function Get-AzureLogicAppConnector
 #>
 
 Get-AzResource | Where-Object {$_.ResourceType -eq 'Microsoft.Web/Connections' -and $_.ResourceId -match 'azuread'}
+}
+function Get-AzureDeviceOwners
+{
+<# 
+.SYNOPSIS
+    Lists the owners of devices in AAD. This will only show devices that have an owner.
+	
+.EXAMPLE
+	Get-AzureDeviceOwners
+#>
 
+    $AADDevices =  Get-AzureADDevice | ?{$_.DeviceOSType -Match "Windows" -Or $_.DeviceOSType -Match "Mac"}
+	$AADDevices | ForEach-Object {
+
+        $Device = $_
+        $DisplayName = $Device.DisplayName
+        $Owner = Get-AzureADDeviceRegisteredOwner -ObjectID $Device.ObjectID   
+        If($Owner){    
+            $AzureDeviceOwner = [PSCustomObject]@{
+                DeviceDisplayname   = $Device.Displayname
+                DeviceID            = $Device.ObjectID
+                DeviceOS            = $Device.DeviceOSType
+                OwnerDisplayName    = $Owner.Displayname
+                OwnerID             = $Owner.ObjectID
+                OwnerType           = $Owner.ObjectType
+                OwnerOnPremID       = $Owner.OnPremisesSecurityIdentifier
+            
+            }
+            $AzureDeviceOwner
+        }       
+	}
 }
